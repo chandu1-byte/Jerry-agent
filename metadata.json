@@ -1,0 +1,6 @@
+{
+  "name": "JERRY AI Accountant",
+  "description": "Professional accounting application for real-estate with Personal A/c, 12 project ledgers, partner accounting, and multilingual AI assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

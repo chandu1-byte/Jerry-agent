@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Security Primitives & Helpers
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'anonymous');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'premdhfa@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isAccountantOrAdmin() {
+      return isAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'accountant']
+      );
+    }
+
+    // Validation helper for Transactions
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'accountType', 'date', 'type', 'amount', 'createdBy']) &&
+        data.keys().hasOnly(['id', 'accountType', 'projectId', 'date', 'type', 'amount', 'particulars', 'toFrom', 'who', 'paymentMode', 'paymentModesJson', 'remarks', 'linkedTxId', 'classification', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.accountType in ['personal', 'project'] &&
+        data.date is string && data.date.size() <= 30 &&
+        data.type in ['DR', 'CR'] &&
+        data.amount is number && data.amount > 0 && data.amount <= 10000000000 &&
+        data.createdBy is string && data.createdBy.size() <= 128 &&
+        (!('particulars' in data) || (data.particulars is string && data.particulars.size() <= 500)) &&
+        (!('toFrom' in data) || (data.toFrom is string && data.toFrom.size() <= 200)) &&
+        (!('who' in data) || (data.who is string && data.who.size() <= 200)) &&
+        (!('remarks' in data) || (data.remarks is string && data.remarks.size() <= 1000)) &&
+        (!('projectId' in data) || (data.projectId is string && data.projectId.size() <= 128)) &&
+        (!('linkedTxId' in data) || (data.linkedTxId is string && data.linkedTxId.size() <= 128));
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId);
+      allow list: if isAdmin();
+      allow write: if isAdmin() && isValidId(adminId);
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && (
+        incoming().role in ['accountant', 'partner'] || isAdmin()
+      );
+      allow update: if isSignedIn() && isValidId(userId) && (
+        isAdmin() ||
+        (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'partnerId']))
+      );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Projects Collection (The 12 Project Ledgers)
+    match /projects/{projectId} {
+      allow get: if isSignedIn() && isValidId(projectId);
+      allow list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(projectId) && isAccountantOrAdmin();
+      allow delete: if isAdmin() && isValidId(projectId);
+    }
+
+    // Partners Collection
+    match /partners/{partnerId} {
+      allow get: if isSignedIn() && isValidId(partnerId);
+      allow list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(partnerId) && isAccountantOrAdmin();
+      allow delete: if isAdmin() && isValidId(partnerId);
+    }
+
+    // Accounts Collection (Personal A/c Config & Opening Balances)
+    match /accounts/{accountId} {
+      allow get: if isSignedIn() && isValidId(accountId);
+      allow list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(accountId) && isAccountantOrAdmin();
+      allow delete: if isAdmin() && isValidId(accountId);
+    }
+
+    // Transactions Collection
+    match /transactions/{transactionId} {
+      allow get: if isSignedIn() && isValidId(transactionId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(transactionId) &&
+        isValidTransaction(incoming()) &&
+        incoming().createdBy == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(transactionId) &&
+        isValidTransaction(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt);
+      allow delete: if isAccountantOrAdmin() && isValidId(transactionId);
+    }
+
+    // Audit Logs Collection (Append-only immutable)
+    match /auditLogs/{logId} {
+      allow get, list: if isAccountantOrAdmin() && isValidId(logId);
+      allow create: if isSignedIn() && isValidId(logId) &&
+        incoming().userId == request.auth.uid;
+      allow update, delete: if false; // Immutable audit log
+    }
+  }
+}

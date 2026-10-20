@@ -1,0 +1,145 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "accountant", "partner"] },
+        "partnerId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin document for RBAC authorization",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Real estate project ledger metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "aliases": { "type": "string" },
+        "description": { "type": "string" },
+        "partnerIds": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "Partner profile associated with real estate projects",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "projectIds": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Personal account settings and opening balances",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cashOpening": { "type": "number" },
+        "hdfcOpening": { "type": "number" },
+        "sbiOpening": { "type": "number" },
+        "unionOpening": { "type": "number" },
+        "isConfigured": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Accounting transaction for personal or project accounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountType": { "type": "string", "enum": ["personal", "project"] },
+        "projectId": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string", "enum": ["DR", "CR"] },
+        "amount": { "type": "number" },
+        "particulars": { "type": "string" },
+        "toFrom": { "type": "string" },
+        "who": { "type": "string" },
+        "paymentMode": { "type": "string" },
+        "paymentModesJson": { "type": "string" },
+        "remarks": { "type": "string" },
+        "linkedTxId": { "type": "string" },
+        "classification": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "accountType", "date", "type", "amount", "createdBy"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit trail for financial record mutations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "action": { "type": "string", "enum": ["create", "update", "delete"] },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "transactionId", "action", "userId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and RBAC role assignments"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Admin user UID registry"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "The 12 real-estate project accounts"
+    },
+    "/partners/{partnerId}": {
+      "schema": "Partner",
+      "description": "Partners and their associated project assignments"
+    },
+    "/accounts/{accountId}": {
+      "schema": "Account",
+      "description": "Personal account configuration and verified opening balances"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Ledger transactions across Personal A/c and Project accounts"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Audit trail log records for transaction edits or deletions"
+    }
+  }
+}
